@@ -44,4 +44,9 @@ const groups = computed(() =>
   border-radius: 50%;
   background: var(--tone);
 }
+@media (max-width: 640px) {
+  .legend {
+    display: none;
+  }
+}
 </style>

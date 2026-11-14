@@ -16,7 +16,10 @@ const emit = defineEmits<{ retry: [] }>()
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 140px;
+  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  width: max-content;
+  max-width: calc(100% - 20px);
+  flex-wrap: wrap;
   padding: 7px 12px;
   font-size: 12px;
   display: flex;

@@ -5,15 +5,19 @@ import type { Point } from '../../layout'
 /** A box placed below an anchor on screen, or above it when there's no room, kept inside the viewport. */
 const props = defineProps<{ anchor: Point; viewport: { width: number; height: number }; below?: number }>()
 
-const WIDTH = 290
+const MAX_WIDTH = 290
 const HEIGHT = 260
 
 const style = computed(() => {
   const below = props.below ?? 30
-  const x = Math.max(10, Math.min(props.anchor.x - WIDTH / 2, props.viewport.width - WIDTH - 10))
+  // Never wider than the screen, so it fits on a phone.
+  const width = Math.min(MAX_WIDTH, props.viewport.width - 20)
+  const x = Math.max(10, Math.min(props.anchor.x - width / 2, props.viewport.width - width - 10))
   let y = props.anchor.y + below
   if (y + HEIGHT > props.viewport.height - 140) y = Math.max(10, props.anchor.y - below - HEIGHT)
-  return { left: `${x}px`, top: `${y}px`, width: `${WIDTH}px` }
+  // A short viewport (a phone with the keyboard up): keep it on screen, even over its note.
+  y = Math.max(10, Math.min(y, props.viewport.height - HEIGHT - 10))
+  return { left: `${x}px`, top: `${y}px`, width: `${width}px` }
 })
 </script>
 

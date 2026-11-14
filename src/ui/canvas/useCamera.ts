@@ -16,8 +16,8 @@ export interface Viewport {
 
 const MIN_SCALE = 0.3
 const MAX_SCALE = 2
-/** Room kept free for the status line at the top and the command bar at the bottom. */
-const INSET = { top: 44, bottom: 150, side: 70 }
+/** Room kept free for the status line at the top and the command bar at the bottom; less on a phone. */
+const insets = (width: number) => (width <= 640 ? { top: 40, bottom: 90, side: 16 } : { top: 44, bottom: 150, side: 70 })
 
 /** Pan and zoom of the canvas: world point p is drawn at `p * s + (x, y)`. */
 export function useCamera() {
@@ -41,6 +41,7 @@ export function useCamera() {
   /** The camera that shows `b` in the free part of the viewport. */
   function fitting(b: Bounds, maxScale = 1.05): Camera {
     const { width, height } = viewport.value
+    const INSET = insets(width)
     const w = width - INSET.side * 2
     const h = height - INSET.top - INSET.bottom
     const s = Math.max(0.42, Math.min(w / (b.maxX - b.minX), h / (b.maxY - b.minY), maxScale))
@@ -52,6 +53,7 @@ export function useCamera() {
   /** Keeps the zoom and moves `p` to the middle of the free area. */
   function centring(p: Point): Camera {
     const { width, height } = viewport.value
+    const INSET = insets(width)
     const s = camera.value.s
     return { s, x: width / 2 - p.x * s, y: INSET.top + (height - INSET.top - INSET.bottom) / 2 - p.y * s }
   }

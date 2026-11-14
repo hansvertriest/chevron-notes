@@ -14,6 +14,7 @@ import {
 import { useBoardStore } from '../state/boardStore'
 import DefineRelation from './DefineRelation.vue'
 import PreviewChips from './PreviewChips.vue'
+import { useMediaQuery } from '../viewport'
 
 const props = defineProps<{ ready: boolean }>()
 const emit = defineEmits<{
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useBoardStore()
+const narrow = useMediaQuery('(max-width: 640px)')
 const input = ref<HTMLInputElement>()
 const value = ref('')
 const cursor = ref(0)
@@ -198,7 +200,8 @@ defineExpose({ focus })
           :class="{ on: i === selected }"
           role="option"
           :aria-selected="i === selected"
-          @mousedown.prevent="pick(i)"
+          @mousedown.prevent
+          @click="pick(i)"
           @mouseenter="selected = i"
         >
           <span class="txt">@ {{ n.text }}</span><span class="sub">{{ degree(n.id) }}</span>
@@ -212,7 +215,8 @@ defineExpose({ focus })
           :class="{ on: i === selected }"
           role="option"
           :aria-selected="i === selected"
-          @mousedown.prevent="pick(i)"
+          @mousedown.prevent
+          @click="pick(i)"
           @mouseenter="selected = i"
         >
           <span class="dot" :class="o.define ? 'dashed' : `tone-${o.type.tone}`"></span>
@@ -231,15 +235,15 @@ defineExpose({ focus })
           v-model="value"
           autocomplete="off"
           spellcheck="false"
-          autofocus
+          enterkeyhint="send"
           aria-label="Command bar"
-          placeholder="Type a thought · @ to link a note · space - for a relation"
+          :placeholder="narrow ? 'Type a thought…' : 'Type a thought · @ to link a note · space - for a relation'"
           @input="onInput"
           @keydown="onKey"
           @keyup="syncCursor"
           @click="syncCursor"
         />
-        <kbd>↵</kbd>
+        <button class="send" type="button" aria-label="Add" @mousedown.prevent @click="submit">↵</button>
       </div>
       <div class="keys">
         <span><kbd>@</kbd> link note</span>
@@ -256,10 +260,26 @@ defineExpose({ focus })
 .bar {
   position: absolute;
   left: 50%;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: min(700px, calc(100% - 32px));
   z-index: 5;
+}
+.send {
+  flex: none;
+  min-width: 32px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: 12px var(--mono);
+  cursor: pointer;
+}
+.send:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .pop {
   position: absolute;
@@ -336,5 +356,30 @@ input {
   padding: 0 12px 8px 30px;
   font-size: 11px;
   color: var(--muted);
+}
+/* Phones: edge to edge, and no keyboard hints on touch screens. */
+@media (max-width: 640px) {
+  .keys {
+    display: none;
+  }
+  .bar {
+    width: calc(100% - 16px);
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .pop {
+    max-height: 40vh;
+  }
+}
+@media (pointer: coarse) {
+  .keys {
+    display: none;
+  }
+  .it {
+    padding: 10px 9px;
+  }
+  .send {
+    min-width: 44px;
+    height: 36px;
+  }
 }
 </style>

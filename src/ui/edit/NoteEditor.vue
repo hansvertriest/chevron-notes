@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { DomainError, nameFrom, splitQuestion, noteById, relationsOf, relationTypeById, type NoteId, type RelationId } from '../../domain'
 import type { Point } from '../../layout'
 import { useBoardStore } from '../state/boardStore'
+import { hasFinePointer } from '../viewport'
 import Popover from './Popover.vue'
 
 const props = defineProps<{
@@ -79,6 +80,8 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => {
   if (props.armDelete) remove()
   else {
+    // On touch screens, wait for a tap: focusing would pop up the keyboard straight away.
+    if (!hasFinePointer()) return
     textInput.value?.focus({ preventScroll: true })
     textInput.value?.select()
   }

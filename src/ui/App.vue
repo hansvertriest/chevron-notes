@@ -15,6 +15,7 @@ import NoteEditor from './edit/NoteEditor.vue'
 import RelationEditor from './edit/RelationEditor.vue'
 import { useAnimatedPositions } from './motion/useAnimatedPositions'
 import { BOARD_STORE, createBoardStore } from './state/boardStore'
+import { hasFinePointer } from './viewport'
 
 const props = defineProps<{ repository: BoardRepository }>()
 
@@ -136,7 +137,8 @@ function onGlobalKey(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onGlobalKey)
   void store.load()
-  bar.value?.focus()
+  // On touch screens focusing would pop up the keyboard over the board.
+  if (hasFinePointer()) bar.value?.focus()
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
 </script>

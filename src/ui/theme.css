@@ -39,8 +39,7 @@
 }
 
 html,
-body,
-#app {
+body {
   margin: 0;
   height: 100%;
   overflow: hidden;
@@ -49,6 +48,16 @@ body,
   background: var(--bg);
   color: var(--ink);
   font: 13px/1.4 var(--sans);
+}
+
+/* Sized to the visible viewport (see viewport.ts), so the on-screen keyboard never covers the bar. */
+#app {
+  position: fixed;
+  left: 0;
+  top: var(--app-top, 0);
+  width: 100%;
+  height: var(--app-height, 100dvh);
+  overflow: hidden;
 }
 
 /*
