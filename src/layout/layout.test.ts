@@ -1,25 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LAYOUT, findClusters, layoutClusters } from './clusterTree'
+import { clusterRoots, DEFAULT_LAYOUT, findClusters, layoutClusters, type Size } from './clusterTree'
 import { boundsOf, edgeGeometry } from './geometry'
 
-const { columnWidth: COL, rowHeight: ROW, nodeWidth: W, nodeHeight: H, clusterGap: GAP } = DEFAULT_LAYOUT
+const { defaultSize: D, siblingGap: GAP, rowGap: ROWGAP, clusterGap: CGAP } = DEFAULT_LAYOUT
+const W = D.width
+const H = D.height
 
 describe('findClusters', () => {
   it('groups connected nodes, ignoring direction, oldest first', () => {
-    const clusters = findClusters({
+    const graph = {
       nodes: ['a', 'b', 'c', 'd', 'e'],
       edges: [
         { from: 'c', to: 'a' },
         { from: 'd', to: 'b' },
         { from: 'c', to: 'e' },
       ],
-    })
-    expect(clusters).toEqual([['a', 'c', 'e'], ['b', 'd']])
+    }
+    expect(findClusters(graph)).toEqual([['a', 'c', 'e'], ['b', 'd']])
+    expect(clusterRoots(graph)).toEqual(new Set(['a', 'b']))
   })
 })
 
 describe('layoutClusters', () => {
-  it('builds a tree from the oldest node, parents centred over leaves', () => {
+  it('builds a tree from the oldest node, parents centred over their children', () => {
     // a is the root even though the edges point at it.
     const { positions, roots } = layoutClusters({
       nodes: ['a', 'b', 'c', 'd'],
@@ -31,17 +34,49 @@ describe('layoutClusters', () => {
     })
     expect(roots).toEqual(new Set(['a']))
     expect(positions.a!.y).toBe(H / 2)
-    expect(positions.b!.y).toBe(H / 2 + ROW)
-    expect(positions.d!.y).toBe(H / 2 + 2 * ROW)
+    expect(positions.b!.y).toBe(H / 2 + H + ROWGAP)
+    expect(positions.d!.y).toBe(H / 2 + 2 * (H + ROWGAP))
     expect(positions.d!.x).toBe(positions.b!.x)
-    expect(positions.c!.x - positions.b!.x).toBe(COL)
+    expect(positions.c!.x - positions.b!.x).toBe(W + GAP)
     expect(positions.a!.x).toBe((positions.b!.x + positions.c!.x) / 2)
+  })
+
+  it('sizes subtrees and rows to the nodes in them', () => {
+    const sizes: Record<string, Size> = {
+      root: { width: 60, height: 30 },
+      wide: { width: 300, height: 30 },
+      tall: { width: 50, height: 90 },
+    }
+    const { positions } = layoutClusters({
+      nodes: ['root', 'wide', 'tall'],
+      edges: [
+        { from: 'root', to: 'wide' },
+        { from: 'root', to: 'tall' },
+      ],
+      sizes,
+    })
+    // Siblings sit exactly a gap apart, edge to edge.
+    expect(positions.tall!.x - 25 - (positions.wide!.x + 150)).toBe(GAP)
+    expect(positions.wide!.x - 150).toBe(0)
+    // The second row is as tall as its tallest node; both are centred in it.
+    expect(positions.wide!.y).toBe(30 + ROWGAP + 45)
+    expect(positions.tall!.y).toBe(positions.wide!.y)
+  })
+
+  it('keeps a wide parent inside its subtree and its children centred under it', () => {
+    const { positions } = layoutClusters({
+      nodes: ['p', 'c'],
+      edges: [{ from: 'p', to: 'c' }],
+      sizes: { p: { width: 400, height: 40 }, c: { width: 40, height: 40 } },
+    })
+    expect(positions.p!.x).toBe(200)
+    expect(positions.c!.x).toBe(200)
   })
 
   it('puts clusters side by side and gives single nodes no root', () => {
     const { positions, roots } = layoutClusters({ nodes: ['a', 'b'], edges: [] })
     expect(roots.size).toBe(0)
-    expect(positions.b!.x - positions.a!.x).toBe(W + GAP)
+    expect(positions.b!.x - positions.a!.x).toBe(W + CGAP)
     expect(positions.b!.y).toBe(positions.a!.y)
   })
 
@@ -74,27 +109,38 @@ describe('layoutClusters', () => {
 })
 
 describe('edgeGeometry', () => {
-  const size = { width: W, height: H }
+  const box = (x: number, y: number, size: Size = D) => ({ at: { x, y }, size })
+  const ROW = H + ROWGAP
+
   it('draws a vertical curve between rows, from bottom to top', () => {
-    const g = edgeGeometry({ x: 0, y: 0 }, { x: 100, y: ROW }, size)
+    const g = edgeGeometry(box(0, 0), box(100, ROW))
     expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
     expect(g.label).toEqual({ x: 50, y: (H / 2 + ROW - H / 2 - 2) / 2 })
   })
+  it('uses each end’s own height', () => {
+    const g = edgeGeometry(box(0, 0, { width: 50, height: 20 }), box(0, 200, { width: 50, height: 80 }))
+    expect(g.d).toBe('M0,10 C0,84 0,84 0,158')
+  })
   it('draws a straight line between neighbours in a row', () => {
-    const g = edgeGeometry({ x: 0, y: 0 }, { x: COL, y: 0 }, size)
-    expect(g.d).toBe(`M${W / 2},0 L${COL - W / 2 - 2},0`)
+    const g = edgeGeometry(box(0, 0), box(W + GAP, 0))
+    expect(g.d).toBe(`M${W / 2},0 L${W + GAP - W / 2 - 2},0`)
   })
   it('dips below the row when notes sit in between', () => {
-    const g = edgeGeometry({ x: 0, y: 0 }, { x: 4 * COL, y: 0 }, size)
+    const g = edgeGeometry(box(0, 0), box(4 * (W + GAP), 0))
     expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
     expect(g.label.y).toBeGreaterThan(H / 2)
-    expect(g.label.y).toBeLessThan(ROW - H / 2)
+    expect(g.label.y).toBeLessThan(H / 2 + ROWGAP)
   })
 })
 
 describe('boundsOf', () => {
   it('includes the node boxes', () => {
-    expect(boundsOf([{ x: 0, y: 0 }, { x: 10, y: 20 }], { width: 4, height: 2 })).toEqual({ minX: -2, maxX: 12, minY: -1, maxY: 21 })
-    expect(boundsOf([], { width: 4, height: 2 })).toBeNull()
+    expect(
+      boundsOf([
+        { at: { x: 0, y: 0 }, size: { width: 4, height: 2 } },
+        { at: { x: 10, y: 20 }, size: { width: 8, height: 2 } },
+      ]),
+    ).toEqual({ minX: -2, maxX: 14, minY: -1, maxY: 21 })
+    expect(boundsOf([])).toBeNull()
   })
 })

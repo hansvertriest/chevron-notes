@@ -11,6 +11,8 @@ const props = defineProps<{
   viewport: { width: number; height: number }
   /** Opened with Backspace: go straight to deleting. */
   armDelete: boolean
+  /** Screen distance from the anchor (the note's centre) to just below the note. */
+  below: number
 }>()
 
 const emit = defineEmits<{
@@ -84,7 +86,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Popover v-if="note" :anchor="anchor" :viewport="viewport" @keydown="onKey">
+  <Popover v-if="note" :anchor="anchor" :viewport="viewport" :below="below" @keydown="onKey">
     <div class="hd">Note</div>
     <input ref="textInput" v-model="text" aria-label="Note text" @input="error = null" />
     <label class="q"><input v-model="question" type="checkbox" /> Question <span class="hint">(or end the text with ?)</span></label>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import type { ChainResult, NoteId, RelationId } from '../domain'
-import { boundsOf, DEFAULT_LAYOUT, edgeGeometry, layoutClusters, type Point } from '../layout'
+import { boundsOf, clusterRoots, DEFAULT_LAYOUT, edgeGeometry, layoutClusters, type Point, type Size } from '../layout'
 import type { BoardRepository } from '../storage'
 import CommandBar from './bar/CommandBar.vue'
 import BoardCanvas from './canvas/BoardCanvas.vue'
+import { measureNote } from './canvas/measureNote'
 import { useCamera } from './canvas/useCamera'
 import BoardOverlay from './chrome/BoardOverlay.vue'
 import SaveStatus from './chrome/SaveStatus.vue'
@@ -22,19 +23,20 @@ provide(BOARD_STORE, store)
 const board = store.board
 
 /* ---------- layout and camera ---------- */
-const NODE = { width: DEFAULT_LAYOUT.nodeWidth, height: DEFAULT_LAYOUT.nodeHeight }
-const layout = computed(() =>
-  layoutClusters({ nodes: board.value.notes.map((n) => n.id), edges: board.value.relations }),
-)
+const graph = computed(() => ({ nodes: board.value.notes.map((n) => n.id), edges: board.value.relations }))
+// Roots are bold, and bold text is wider, so they are known before measuring.
+const sizes = computed(() => {
+  const roots = clusterRoots(graph.value)
+  return Object.fromEntries(board.value.notes.map((n) => [n.id, measureNote(n.text, roots.has(n.id))]))
+})
+const sizeOf = (id: NoteId): Size => sizes.value[id] ?? DEFAULT_LAYOUT.defaultSize
+const layout = computed(() => layoutClusters({ ...graph.value, sizes: sizes.value }))
 const target = computed(() => layout.value.positions)
 const shown = useAnimatedPositions(target)
 const cam = useCamera()
 
 function boundsFor(ids: readonly NoteId[]) {
-  return boundsOf(
-    ids.flatMap((id) => target.value[id] ?? []),
-    NODE,
-  )
+  return boundsOf(ids.flatMap((id) => (target.value[id] ? [{ at: target.value[id], size: sizeOf(id) }] : [])))
 }
 
 // Fit the whole board once it has loaded and the canvas has a size.
@@ -110,7 +112,9 @@ const editorAnchor = computed<Point | null>(() => {
   const r = board.value.relations.find((x) => x.id === e.id)
   const a = r && shown.value[r.from]
   const b = r && shown.value[r.to]
-  return a && b ? cam.toScreen(edgeGeometry(a, b, NODE).label) : null
+  return a && b && r
+    ? cam.toScreen(edgeGeometry({ at: a, size: sizeOf(r.from) }, { at: b, size: sizeOf(r.to) }).label)
+    : null
 })
 
 /* ---------- keyboard ---------- */
@@ -136,6 +140,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       ref="canvas"
       :board="board"
       :positions="shown"
+      :sizes="sizes"
       :roots="layout.roots"
       :fresh="fresh"
       :highlighted="marked"
@@ -164,6 +169,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       :anchor="editorAnchor"
       :viewport="cam.viewport.value"
       :arm-delete="editing.armDelete"
+      :below="(sizeOf(editing.id).height / 2) * cam.camera.value.s + 8"
       @close="(deleted) => closeNoteEditor((editing as { id: NoteId }).id, deleted)"
       @open-relation="openRelation"
     />

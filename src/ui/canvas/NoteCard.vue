@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Note } from '../../domain'
-import type { Point } from '../../layout'
+import type { Point, Size } from '../../layout'
 
 defineProps<{
   note: Note
   at: Point
+  size: Size
   root: boolean
   fresh: boolean
   highlighted: boolean
@@ -30,14 +31,18 @@ function onKey(e: KeyboardEvent) {
   <div
     class="note"
     :class="{ root, fresh, highlighted, unsaved, selected, question: note.question }"
-    :style="{ transform: `translate(${at.x - 84}px, ${at.y - 23}px)` }"
+    :style="{
+      transform: `translate(${at.x - size.width / 2}px, ${at.y - size.height / 2}px)`,
+      width: `${size.width}px`,
+      height: `${size.height}px`,
+    }"
     :title="note.question ? `${note.text}?` : note.text"
     :data-note="note.id"
     tabindex="0"
     @click.stop="emit('open', false)"
     @keydown="onKey"
   >
-    <span class="inner"><span class="text">{{ note.text }}</span></span>
+    <span class="inner note-box" :class="{ bold: root }">{{ note.text }}</span>
   </div>
 </template>
 
@@ -46,36 +51,20 @@ function onKey(e: KeyboardEvent) {
   position: absolute;
   left: 0;
   top: 0;
-  width: 168px;
-  height: 46px;
   cursor: pointer;
   outline: none;
 }
+/* Size comes from measureNote; .note-box (theme.css) holds the font, padding and border. */
 .inner {
   display: flex;
   align-items: center;
   width: 100%;
   height: 100%;
-  padding: 0 11px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  max-width: none;
   background: var(--surface);
-  line-height: 1.3;
   transition:
     box-shadow 0.2s,
     border-color 0.2s;
-}
-.text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-.root .inner {
-  border-width: 1.5px;
-  font-weight: 600;
 }
 .note:focus-visible .inner,
 .selected .inner {

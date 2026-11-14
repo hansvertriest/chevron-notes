@@ -1,10 +1,13 @@
 /**
- * Cluster layout: a pure function from a graph to positions.
+ * Cluster layout: a pure function from a graph (with a size per node) to
+ * positions.
  *
  * Each cluster (connected component) becomes a top-to-bottom tree. The root
  * is the cluster's oldest node, the tree is built breadth-first ignoring
- * edge direction, and every parent is centred over its leaves. Clusters sit
- * side by side and wrap to a new row when a row gets too wide.
+ * edge direction, and every parent is centred over its children. Each
+ * subtree is as wide as it needs to be for its nodes, and each row as tall
+ * as its tallest node. Clusters sit side by side and wrap to a new row when
+ * a row gets too wide.
  */
 
 export interface Point {
@@ -12,26 +15,33 @@ export interface Point {
   y: number
 }
 
+export interface Size {
+  width: number
+  height: number
+}
+
 export interface LayoutGraph {
   /** Node ids, oldest first. */
   nodes: readonly string[]
   edges: readonly { from: string; to: string }[]
+  /** Box size per node; nodes without one get `defaultSize`. */
+  sizes?: Readonly<Record<string, Size>>
 }
 
 export interface LayoutOptions {
-  nodeWidth: number
-  nodeHeight: number
-  columnWidth: number
-  rowHeight: number
+  defaultSize: Size
+  /** Horizontal space between neighbouring subtrees. */
+  siblingGap: number
+  /** Vertical space between rows, where the edge labels go. */
+  rowGap: number
   clusterGap: number
   maxRowWidth: number
 }
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
-  nodeWidth: 168,
-  nodeHeight: 46,
-  columnWidth: 196,
-  rowHeight: 130,
+  defaultSize: { width: 168, height: 46 },
+  siblingGap: 28,
+  rowGap: 84,
   clusterGap: 110,
   maxRowWidth: 1500,
 }
@@ -79,8 +89,19 @@ export function findClusters(graph: LayoutGraph): string[][] {
   return clusters
 }
 
-/** Positions of one cluster relative to its own top-left slot: x in columns, y in rows. */
-function treeSlots(root: string, adj: Map<string, Set<string>>, order: Map<string, number>) {
+/** The roots the layout will use, without laying out (the UI needs them to size the nodes). */
+export function clusterRoots(graph: LayoutGraph): Set<string> {
+  return new Set(findClusters(graph).flatMap((c) => (c.length > 1 ? [c[0]!] : [])))
+}
+
+/** Lays out one cluster with its top-left corner at (0, 0). */
+function layoutTree(
+  root: string,
+  adj: Map<string, Set<string>>,
+  order: Map<string, number>,
+  size: (id: string) => Size,
+  options: LayoutOptions,
+) {
   const children = new Map<string, string[]>()
   const depth = new Map([[root, 0]])
   const queue = [root]
@@ -94,29 +115,59 @@ function treeSlots(root: string, adj: Map<string, Set<string>>, order: Map<strin
     children.set(id, kids)
   }
 
-  const column = new Map<string, number>()
-  let nextLeaf = 0
-  const place = (id: string) => {
+  // Each row is as tall as its tallest node; nodes are centred in their row.
+  const rowHeights: number[] = []
+  for (const [id, d] of depth) rowHeights[d] = Math.max(rowHeights[d] ?? 0, size(id).height)
+  const rowCentres: number[] = []
+  let top = 0
+  rowHeights.forEach((h, d) => {
+    rowCentres[d] = top + h / 2
+    top += h + options.rowGap
+  })
+  const height = top - options.rowGap
+
+  // A subtree is as wide as its root or its children side by side, whichever is wider.
+  const widths = new Map<string, number>()
+  const subtreeWidth = (id: string): number => {
     const kids = children.get(id)!
+    const kidsWidth = kids.reduce((sum, k) => sum + subtreeWidth(k), 0) + options.siblingGap * Math.max(0, kids.length - 1)
+    const w = Math.max(size(id).width, kidsWidth)
+    widths.set(id, w)
+    return w
+  }
+  const width = subtreeWidth(root)
+
+  const positions: Record<string, Point> = {}
+  const place = (id: string, left: number) => {
+    const kids = children.get(id)!
+    const w = widths.get(id)!
+    const own = size(id).width
+    const y = rowCentres[depth.get(id)!]!
     if (!kids.length) {
-      column.set(id, nextLeaf++)
+      positions[id] = { x: left + w / 2, y }
       return
     }
-    kids.forEach(place)
-    column.set(id, (column.get(kids[0]!)! + column.get(kids.at(-1)!)!) / 2)
+    const kidsWidth = kids.reduce((sum, k) => sum + widths.get(k)!, 0) + options.siblingGap * (kids.length - 1)
+    let x = left + (w - kidsWidth) / 2
+    for (const k of kids) {
+      place(k, x)
+      x += widths.get(k)! + options.siblingGap
+    }
+    // Centred over the first and last child, but never sticking out of its own subtree.
+    const mid = (positions[kids[0]!]!.x + positions[kids.at(-1)!]!.x) / 2
+    positions[id] = { x: Math.min(Math.max(mid, left + own / 2), left + w - own / 2), y }
   }
-  place(root)
-  return { column, depth, width: nextLeaf }
+  place(root, 0)
+  return { positions, width, height }
 }
 
 export function layoutClusters(graph: LayoutGraph, options: LayoutOptions = DEFAULT_LAYOUT): Layout {
   const adj = adjacency(graph)
   const order = new Map(graph.nodes.map((id, i) => [id, i]))
+  const size = (id: string) => graph.sizes?.[id] ?? options.defaultSize
   const clusters = findClusters(graph)
   const positions: Record<string, Point> = {}
   const roots = new Set<string>()
-  const halfW = options.nodeWidth / 2
-  const halfH = options.nodeHeight / 2
 
   let x = 0
   let y = 0
@@ -124,23 +175,15 @@ export function layoutClusters(graph: LayoutGraph, options: LayoutOptions = DEFA
   for (const cluster of clusters) {
     const root = cluster[0]!
     if (cluster.length > 1) roots.add(root)
-    const { column, depth, width } = treeSlots(root, adj, order)
-    const maxDepth = Math.max(...cluster.map((id) => depth.get(id)!))
-    const w = (width - 1) * options.columnWidth + options.nodeWidth
-    const h = maxDepth * options.rowHeight + options.nodeHeight
-    if (x > 0 && x + w > options.maxRowWidth) {
+    const tree = layoutTree(root, adj, order, size, options)
+    if (x > 0 && x + tree.width > options.maxRowWidth) {
       x = 0
       y += rowHeight + options.clusterGap
       rowHeight = 0
     }
-    for (const id of cluster) {
-      positions[id] = {
-        x: x + halfW + column.get(id)! * options.columnWidth,
-        y: y + halfH + depth.get(id)! * options.rowHeight,
-      }
-    }
-    x += w + options.clusterGap
-    rowHeight = Math.max(rowHeight, h)
+    for (const [id, p] of Object.entries(tree.positions)) positions[id] = { x: p.x + x, y: p.y + y }
+    x += tree.width + options.clusterGap
+    rowHeight = Math.max(rowHeight, tree.height)
   }
   return { positions, roots, clusters }
 }

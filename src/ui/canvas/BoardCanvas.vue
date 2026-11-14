@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Board, NoteId, RelationId, Tone } from '../../domain'
-import { DEFAULT_LAYOUT, edgeGeometry, type Point } from '../../layout'
+import { DEFAULT_LAYOUT, edgeGeometry, type Point, type Size } from '../../layout'
 import NoteCard from './NoteCard.vue'
 import type { CameraControls } from './useCamera'
 
 const props = defineProps<{
   board: Board
   positions: Record<string, Point>
+  sizes: Record<string, Size>
   roots: Set<NoteId>
   fresh: Set<string>
   highlighted: Set<NoteId>
@@ -24,7 +25,6 @@ const emit = defineEmits<{
   backgroundDown: []
 }>()
 
-const size = { width: DEFAULT_LAYOUT.nodeWidth, height: DEFAULT_LAYOUT.nodeHeight }
 const TONES: Tone[] = ['positive', 'negative', 'neutral']
 
 const edges = computed(() =>
@@ -33,7 +33,9 @@ const edges = computed(() =>
     const b = props.positions[r.to]
     const type = props.board.relationTypes.find((t) => t.id === r.typeId)
     if (!a || !b || !type) return []
-    return [{ id: r.id, type, geo: edgeGeometry(a, b, size) }]
+    const size = (id: string) => props.sizes[id] ?? DEFAULT_LAYOUT.defaultSize
+    const geo = edgeGeometry({ at: a, size: size(r.from) }, { at: b, size: size(r.to) }, DEFAULT_LAYOUT.rowGap)
+    return [{ id: r.id, type, geo }]
   }),
 )
 
@@ -174,6 +176,7 @@ function onLabelKey(e: KeyboardEvent, id: RelationId) {
           v-if="positions[n.id]"
           :note="n"
           :at="positions[n.id]!"
+          :size="sizes[n.id] ?? DEFAULT_LAYOUT.defaultSize"
           :root="roots.has(n.id)"
           :fresh="fresh.has(n.id)"
           :highlighted="highlighted.has(n.id)"
