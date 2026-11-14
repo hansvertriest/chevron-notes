@@ -27,7 +27,8 @@ function boxExit(c: Point, dx: number, dy: number, half: Size, pad: number): Poi
 
 /**
  * Between rows: a vertical bezier from the bottom of one box to the top of
- * the other, labelled at its midpoint. Within a row: a straight line.
+ * the other, labelled at its midpoint. Within a row: a straight line between
+ * neighbours, and a curve dipping below the row when notes sit in between.
  */
 export function edgeGeometry(a: Point, b: Point, node: Size): EdgeGeometry {
   const half = { width: node.width / 2, height: node.height / 2 }
@@ -44,6 +45,17 @@ export function edgeGeometry(a: Point, b: Point, node: Size): EdgeGeometry {
     }
   }
   const dx = b.x - a.x
+  if (Math.abs(dx) > node.width * 1.5) {
+    // Same row, with notes in between: dip below the row instead of crossing them.
+    const y1 = a.y + half.height
+    const y2 = b.y + half.height + ARROW_GAP
+    const depth = Math.min(60, 30 + Math.abs(dx) * 0.05)
+    const [ax, bx] = [r(a.x), r(b.x)]
+    return {
+      d: `M${ax},${r(y1)} C${ax},${r(y1 + depth)} ${bx},${r(y2 + depth)} ${bx},${r(y2)}`,
+      label: { x: (a.x + b.x) / 2, y: (y1 + y2) / 2 + depth * 0.75 },
+    }
+  }
   const p1 = boxExit(a, dx, dy, half, 0)
   const p2 = boxExit(b, -dx, -dy, half, ARROW_GAP)
   return {

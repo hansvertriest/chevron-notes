@@ -80,9 +80,15 @@ describe('edgeGeometry', () => {
     expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
     expect(g.label).toEqual({ x: 50, y: (H / 2 + ROW - H / 2 - 2) / 2 })
   })
-  it('draws a straight line within a row', () => {
-    const g = edgeGeometry({ x: 0, y: 0 }, { x: 300, y: 0 }, size)
-    expect(g.d).toBe(`M${W / 2},0 L${300 - W / 2 - 2},0`)
+  it('draws a straight line between neighbours in a row', () => {
+    const g = edgeGeometry({ x: 0, y: 0 }, { x: COL, y: 0 }, size)
+    expect(g.d).toBe(`M${W / 2},0 L${COL - W / 2 - 2},0`)
+  })
+  it('dips below the row when notes sit in between', () => {
+    const g = edgeGeometry({ x: 0, y: 0 }, { x: 4 * COL, y: 0 }, size)
+    expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
+    expect(g.label.y).toBeGreaterThan(H / 2)
+    expect(g.label.y).toBeLessThan(ROW - H / 2)
   })
 })
 
