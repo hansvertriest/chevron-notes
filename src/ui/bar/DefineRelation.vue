@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { RelationTypeDraft, Tone } from '../../domain'
+import { hasFinePointer } from '../viewport'
 
 const props = defineProps<{ name: string; error: string | null }>()
 const emit = defineEmits<{ create: [draft: RelationTypeDraft]; cancel: [] }>()
@@ -35,7 +36,14 @@ function onKey(e: KeyboardEvent) {
   e.preventDefault()
 }
 
-onMounted(() => inverseInput.value?.focus({ preventScroll: true }))
+// With a mouse, go straight to the inverse field. On touch screens leave focus in the bar:
+// moving it from code can close the on-screen keyboard and make the panel jump.
+onMounted(() => {
+  if (hasFinePointer()) inverseInput.value?.focus({ preventScroll: true })
+})
+
+/** The bar calls this when ↵ is pressed (or tapped) while this panel is open. */
+defineExpose({ create })
 </script>
 
 <template>
@@ -55,13 +63,15 @@ onMounted(() => inverseInput.value?.focus({ preventScroll: true }))
         spellcheck="false"
         autocomplete="off"
       />
-      <label class="small"><input v-model="symmetric" type="checkbox" /> symmetric (same both ways)</label>
+      <label class="small" @mousedown.prevent><input v-model="symmetric" type="checkbox" /> symmetric (same both ways)</label>
     </div>
     <div class="row">
       <span>Canvas shows</span>
       <span class="toggle" :class="{ off: symmetric }" role="radiogroup">
-        <button type="button" :class="{ on: canvasShows === 'name' }" @click="canvasShows = 'name'">{{ name }}</button>
-        <button type="button" :class="{ on: canvasShows === 'inverse' }" @click="canvasShows = 'inverse'">
+        <button type="button" :class="{ on: canvasShows === 'name' }" @mousedown.prevent @click="canvasShows = 'name'">
+          {{ name }}
+        </button>
+        <button type="button" :class="{ on: canvasShows === 'inverse' }" @mousedown.prevent @click="canvasShows = 'inverse'">
           {{ inverseLabel }}
         </button>
       </span>
@@ -72,17 +82,18 @@ onMounted(() => inverseInput.value?.focus({ preventScroll: true }))
           :key="t.value"
           type="button"
           :class="[`tone-${t.value}`, { on: tone === t.value }]"
+          @mousedown.prevent
           @click="tone = t.value"
         >
           {{ t.label }}
         </button>
       </span>
     </div>
-    <div class="row keys">
-      <span><kbd>↵</kbd> create and add the chain</span>
-      <span><kbd>Tab</kbd> next field</span>
-      <span><kbd>Esc</kbd> back to the input</span>
-      <span v-if="error" class="msg">{{ error }}</span>
+    <div v-if="error" class="msg">{{ error }}</div>
+    <div class="row">
+      <button class="btn primary" type="button" @mousedown.prevent @click="create">Create and add ↵</button>
+      <button class="btn" type="button" @mousedown.prevent @click="emit('cancel')">Cancel</button>
+      <span class="keys"><kbd>Tab</kbd> next field · <kbd>Esc</kbd> back to the input</span>
     </div>
   </div>
 </template>
@@ -152,5 +163,27 @@ input[type='text'] {
 .msg {
   font-size: 12px;
   color: var(--negative);
+}
+/* Phones and touch: bigger targets, no keyboard hints. */
+@media (max-width: 640px), (pointer: coarse) {
+  .row > .keys {
+    display: none;
+  }
+  .gap {
+    margin-left: 0;
+  }
+  input[type='text'] {
+    flex: 1;
+    min-width: 0;
+  }
+  .small {
+    flex-basis: 100%;
+  }
+  .toggle button {
+    padding: 7px 12px;
+  }
+  .btn {
+    padding: 8px 14px;
+  }
 }
 </style>

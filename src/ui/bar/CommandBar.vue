@@ -29,7 +29,8 @@ const emit = defineEmits<{
 
 const store = useBoardStore()
 const narrow = useMediaQuery('(max-width: 640px)')
-const input = ref<HTMLInputElement>()
+const input = ref<HTMLTextAreaElement>()
+const definePanel = ref<InstanceType<typeof DefineRelation>>()
 const value = ref('')
 const cursor = ref(0)
 /** Esc closes the suggestions until the next keystroke. */
@@ -77,11 +78,23 @@ function syncCursor() {
   cursor.value = input.value?.selectionStart ?? value.value.length
 }
 
+/** The bar wraps and grows with its text, up to a few lines, then scrolls. */
+function autoGrow() {
+  const el = input.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
 function onInput() {
+  // One chain is one line: pasted line breaks become spaces.
+  if (/[\r\n]/.test(value.value)) value.value = value.value.replace(/\s*[\r\n]+\s*/g, ' ')
   suppressed.value = false
   message.value = null
   syncCursor()
 }
+
+watch(value, () => void nextTick(autoGrow))
 
 function setValue(v: string, pos: number) {
   value.value = v
@@ -100,6 +113,8 @@ function pick(i = selected.value) {
 
 function submit() {
   if (!props.ready) return emit('retryLoad')
+  // While a relation is being defined, ↵ (typed or tapped) creates it and then adds the chain.
+  if (defining.value) return definePanel.value?.create()
   if (!value.value.trim()) return
   const c = chain.value
   if (c.errors.length) {
@@ -156,6 +171,8 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter') {
     e.preventDefault()
     submit()
+  } else if (e.key === 'Escape' && defining.value) {
+    cancelDefine()
   } else if (e.key === 'Tab' && !e.shiftKey && !value.value && store.board.value.notes.length) {
     e.preventDefault()
     emit('tabToNodes')
@@ -185,7 +202,7 @@ defineExpose({ focus })
 <template>
   <div class="bar">
     <div v-if="defining" class="box pop">
-      <DefineRelation :key="defining.name" :name="defining.name" :error="defining.error" @create="define" @cancel="cancelDefine" />
+      <DefineRelation ref="definePanel" :key="defining.name" :name="defining.name" :error="defining.error" @create="define" @cancel="cancelDefine" />
     </div>
     <div v-else-if="suggestions.items.length" class="box pop" role="listbox">
       <div class="hd">
@@ -230,10 +247,13 @@ defineExpose({ focus })
       <PreviewChips v-if="value.trim()" :chain="chain" :message="shownMessage" />
       <div class="in-row">
         <span class="prompt">›</span>
-        <input
+        <textarea
           ref="input"
           v-model="value"
+          rows="1"
           autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
           spellcheck="false"
           enterkeyhint="send"
           aria-label="Command bar"
@@ -242,7 +262,8 @@ defineExpose({ focus })
           @keydown="onKey"
           @keyup="syncCursor"
           @click="syncCursor"
-        />
+          @select="syncCursor"
+        ></textarea>
         <button class="send" type="button" aria-label="Add" @mousedown.prevent @click="submit">↵</button>
       </div>
       <div class="keys">
@@ -287,8 +308,10 @@ defineExpose({ focus })
   left: 0;
   right: 0;
   padding: 4px;
-  max-height: 50vh;
+  /* The app is as tall as the visible viewport (viewport.ts), so this stays above the keyboard. */
+  max-height: min(50vh, calc(var(--app-height, 100dvh) - 160px));
   overflow: auto;
+  overscroll-behavior: contain;
 }
 .hd {
   font-size: 11px;
@@ -341,13 +364,23 @@ defineExpose({ focus })
   color: var(--accent);
   font-weight: 700;
 }
-input {
+textarea {
   flex: 1;
+  align-self: center;
+  min-width: 0;
+  max-height: 7.5em;
+  padding: 0;
   border: 0;
   outline: 0;
+  resize: none;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   background: transparent;
   color: var(--ink);
-  font: 14px var(--mono);
+  font: 14px/1.5 var(--mono);
+  /* Scrolling the text with a finger, even though the page itself never scrolls. */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 .keys {
   display: flex;
@@ -365,9 +398,6 @@ input {
   .bar {
     width: calc(100% - 16px);
     bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-  }
-  .pop {
-    max-height: 40vh;
   }
 }
 @media (pointer: coarse) {
