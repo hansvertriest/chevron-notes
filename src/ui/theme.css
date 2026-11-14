@@ -44,9 +44,24 @@ body,
   margin: 0;
   height: 100%;
   overflow: hidden;
+  /* No double-tap zoom: the canvas has its own zoom. */
+  touch-action: manipulation;
   background: var(--bg);
   color: var(--ink);
   font: 13px/1.4 var(--sans);
+}
+
+/*
+ * On touch screens, iOS Safari zooms the page into any input with text under
+ * 16px when it gets focus. Inputs there get 16px; !important because the
+ * components set their own (smaller) sizes in scoped styles.
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 kbd {
