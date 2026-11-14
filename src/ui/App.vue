@@ -5,7 +5,7 @@ import { boundsOf, clusterRoots, DEFAULT_LAYOUT, edgeGeometry, layoutClusters, t
 import type { BoardRepository } from '../storage'
 import CommandBar from './bar/CommandBar.vue'
 import BoardCanvas from './canvas/BoardCanvas.vue'
-import { measureNote } from './canvas/measureNote'
+import { measureLabel, measureNote } from './canvas/measure'
 import { useCamera } from './canvas/useCamera'
 import BoardOverlay from './chrome/BoardOverlay.vue'
 import SaveStatus from './chrome/SaveStatus.vue'
@@ -23,7 +23,14 @@ provide(BOARD_STORE, store)
 const board = store.board
 
 /* ---------- layout and camera ---------- */
-const graph = computed(() => ({ nodes: board.value.notes.map((n) => n.id), edges: board.value.relations }))
+const graph = computed(() => ({
+  nodes: board.value.notes.map((n) => n.id),
+  edges: board.value.relations.map((r) => {
+    const type = board.value.relationTypes.find((t) => t.id === r.typeId)
+    // Plain links have no label; the layout keeps room for every other label.
+    return { from: r.from, to: r.to, labelWidth: type && !type.plain ? measureLabel(type.canonical) : 0 }
+  }),
+}))
 // Roots are bold, and bold text is wider, so they are known before measuring.
 const sizes = computed(() => {
   const roots = clusterRoots(graph.value)

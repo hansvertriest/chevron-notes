@@ -5,8 +5,8 @@
  * Each cluster (connected component) becomes a top-to-bottom tree. The root
  * is the cluster's oldest node, the tree is built breadth-first ignoring
  * edge direction, and every parent is centred over its children. Each
- * subtree is as wide as it needs to be for its nodes, and each row as tall
- * as its tallest node. Clusters sit side by side and wrap to a new row when
+ * subtree is as wide as it needs to be for its nodes and for the label on
+ * the edge above each node, and each row as tall as its tallest node. Clusters sit side by side and wrap to a new row when
  * a row gets too wide.
  */
 
@@ -23,7 +23,8 @@ export interface Size {
 export interface LayoutGraph {
   /** Node ids, oldest first. */
   nodes: readonly string[]
-  edges: readonly { from: string; to: string }[]
+  /** `labelWidth`: room the edge's label needs, reserved above the child it leads to. */
+  edges: readonly { from: string; to: string; labelWidth?: number }[]
   /** Box size per node; nodes without one get `defaultSize`. */
   sizes?: Readonly<Record<string, Size>>
 }
@@ -32,6 +33,8 @@ export interface LayoutOptions {
   defaultSize: Size
   /** Horizontal space between neighbouring subtrees. */
   siblingGap: number
+  /** Extra room around an edge label, so neighbouring labels don't touch. */
+  labelPadding: number
   /** Vertical space between rows, where the edge labels go. */
   rowGap: number
   clusterGap: number
@@ -40,8 +43,9 @@ export interface LayoutOptions {
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
   defaultSize: { width: 168, height: 46 },
-  siblingGap: 28,
-  rowGap: 84,
+  siblingGap: 40,
+  labelPadding: 24,
+  rowGap: 100,
   clusterGap: 110,
   maxRowWidth: 1500,
 }
@@ -52,6 +56,16 @@ export interface Layout {
   /** Roots of clusters with more than one node (drawn in bold). */
   roots: Set<string>
   clusters: string[][]
+}
+
+/** Label width per unordered node pair, the widest when there are several edges. */
+function labelWidths(graph: LayoutGraph): Map<string, number> {
+  const widths = new Map<string, number>()
+  for (const e of graph.edges) {
+    if (!e.labelWidth) continue
+    for (const key of [`${e.from}\n${e.to}`, `${e.to}\n${e.from}`]) widths.set(key, Math.max(widths.get(key) ?? 0, e.labelWidth))
+  }
+  return widths
 }
 
 function adjacency(graph: LayoutGraph): Map<string, Set<string>> {
@@ -100,9 +114,11 @@ function layoutTree(
   adj: Map<string, Set<string>>,
   order: Map<string, number>,
   size: (id: string) => Size,
+  labels: Map<string, number>,
   options: LayoutOptions,
 ) {
   const children = new Map<string, string[]>()
+  const parent = new Map<string, string>()
   const depth = new Map([[root, 0]])
   const queue = [root]
   while (queue.length) {
@@ -110,6 +126,7 @@ function layoutTree(
     const kids = [...adj.get(id)!].filter((n) => !depth.has(n)).sort((a, b) => order.get(a)! - order.get(b)!)
     for (const kid of kids) {
       depth.set(kid, depth.get(id)! + 1)
+      parent.set(kid, id)
       queue.push(kid)
     }
     children.set(id, kids)
@@ -126,12 +143,19 @@ function layoutTree(
   })
   const height = top - options.rowGap
 
+  // A node takes the room of its box, or of the label on the edge from its parent if that is wider.
+  const slot = (id: string) => {
+    const p = parent.get(id)
+    const label = p === undefined ? 0 : (labels.get(`${p}\n${id}`) ?? 0)
+    return Math.max(size(id).width, label ? label + options.labelPadding : 0)
+  }
+
   // A subtree is as wide as its root or its children side by side, whichever is wider.
   const widths = new Map<string, number>()
   const subtreeWidth = (id: string): number => {
     const kids = children.get(id)!
     const kidsWidth = kids.reduce((sum, k) => sum + subtreeWidth(k), 0) + options.siblingGap * Math.max(0, kids.length - 1)
-    const w = Math.max(size(id).width, kidsWidth)
+    const w = Math.max(slot(id), kidsWidth)
     widths.set(id, w)
     return w
   }
@@ -141,7 +165,7 @@ function layoutTree(
   const place = (id: string, left: number) => {
     const kids = children.get(id)!
     const w = widths.get(id)!
-    const own = size(id).width
+    const own = slot(id)
     const y = rowCentres[depth.get(id)!]!
     if (!kids.length) {
       positions[id] = { x: left + w / 2, y }
@@ -166,6 +190,7 @@ export function layoutClusters(graph: LayoutGraph, options: LayoutOptions = DEFA
   const order = new Map(graph.nodes.map((id, i) => [id, i]))
   const size = (id: string) => graph.sizes?.[id] ?? options.defaultSize
   const clusters = findClusters(graph)
+  const labels = labelWidths(graph)
   const positions: Record<string, Point> = {}
   const roots = new Set<string>()
 
@@ -175,7 +200,7 @@ export function layoutClusters(graph: LayoutGraph, options: LayoutOptions = DEFA
   for (const cluster of clusters) {
     const root = cluster[0]!
     if (cluster.length > 1) roots.add(root)
-    const tree = layoutTree(root, adj, order, size, options)
+    const tree = layoutTree(root, adj, order, size, labels, options)
     if (x > 0 && x + tree.width > options.maxRowWidth) {
       x = 0
       y += rowHeight + options.clusterGap

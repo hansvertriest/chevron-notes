@@ -58,6 +58,7 @@ function onKey(e: KeyboardEvent) {
 .inner {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
   max-width: none;

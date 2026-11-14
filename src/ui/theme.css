@@ -102,10 +102,11 @@ button {
 /* A note's box. Shared by the canvas and by measureNote, which sizes the layout from it. */
 .note-box {
   box-sizing: border-box;
-  min-width: 48px;
+  min-width: 64px;
   max-width: 240px;
-  min-height: 34px;
-  padding: 7px 11px;
+  min-height: 40px;
+  padding: 10px 16px;
+  text-align: center;
   border: 1px solid var(--line);
   border-radius: 9px;
   font: 13px/1.3 var(--sans);
@@ -115,6 +116,13 @@ button {
 .note-box.bold {
   border-width: 1.5px;
   font-weight: 600;
+}
+
+/* A relation's label on the canvas. Shared with measureLabel, which reserves room for it. */
+.edge-label {
+  font: 11px var(--mono);
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 
 .tone-positive {

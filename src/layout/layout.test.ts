@@ -73,6 +73,19 @@ describe('layoutClusters', () => {
     expect(positions.c!.x).toBe(200)
   })
 
+  it('reserves room for the label on the edge above each child', () => {
+    const tiny = { width: 50, height: 30 }
+    const sizes = { p: tiny, a: tiny, b: tiny }
+    const edges = [
+      { from: 'p', to: 'a', labelWidth: 100 },
+      { from: 'b', to: 'p', labelWidth: 100 },
+    ]
+    const { positions } = layoutClusters({ nodes: ['p', 'a', 'b'], edges, sizes })
+    expect(positions.b!.x - positions.a!.x).toBe(100 + DEFAULT_LAYOUT.labelPadding + GAP)
+    const plain = layoutClusters({ nodes: ['p', 'a', 'b'], edges: edges.map(({ from, to }) => ({ from, to })), sizes })
+    expect(plain.positions.b!.x - plain.positions.a!.x).toBe(50 + GAP)
+  })
+
   it('puts clusters side by side and gives single nodes no root', () => {
     const { positions, roots } = layoutClusters({ nodes: ['a', 'b'], edges: [] })
     expect(roots.size).toBe(0)
@@ -114,22 +127,34 @@ describe('edgeGeometry', () => {
 
   it('draws a vertical curve between rows, from bottom to top', () => {
     const g = edgeGeometry(box(0, 0), box(100, ROW))
-    expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
-    expect(g.label).toEqual({ x: 50, y: (H / 2 + ROW - H / 2 - 2) / 2 })
+    expect(g.d).toBe(`M0,${H / 2} C0,${(H / 2 + ROW - H / 2 - 2) / 2} 100,${(H / 2 + ROW - H / 2 - 2) / 2} 100,${ROW - H / 2 - 2}`)
   })
+
+  it('puts the label on the curve, towards the lower note', () => {
+    const top = H / 2
+    const bottom = ROW - H / 2 - 2
+    const down = edgeGeometry(box(0, 0), box(100, ROW))
+    expect(down.label.y).toBeGreaterThan((top + bottom) / 2)
+    expect(down.label.y).toBeLessThan(bottom - 20)
+    expect(down.label.x).toBeGreaterThan(50)
+    // An edge pointing up still has its label near the lower note.
+    const up = edgeGeometry(box(100, ROW), box(0, 0))
+    expect(up.label.x).toBeCloseTo(down.label.x)
+    expect(up.label.y).toBeGreaterThan(ROW / 2)
+  })
+
   it('uses each end’s own height', () => {
     const g = edgeGeometry(box(0, 0, { width: 50, height: 20 }), box(0, 200, { width: 50, height: 80 }))
     expect(g.d).toBe('M0,10 C0,84 0,84 0,158')
   })
-  it('draws a straight line between neighbours in a row', () => {
-    const g = edgeGeometry(box(0, 0), box(W + GAP, 0))
-    expect(g.d).toBe(`M${W / 2},0 L${W + GAP - W / 2 - 2},0`)
-  })
-  it('dips below the row when notes sit in between', () => {
-    const g = edgeGeometry(box(0, 0), box(4 * (W + GAP), 0))
-    expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
-    expect(g.label.y).toBeGreaterThan(H / 2)
-    expect(g.label.y).toBeLessThan(H / 2 + ROWGAP)
+
+  it('curves below the row within a row, even between neighbours', () => {
+    for (const dx of [W + GAP, 4 * (W + GAP)]) {
+      const g = edgeGeometry(box(0, 0), box(dx, 0))
+      expect(g.d.startsWith(`M0,${H / 2} C`)).toBe(true)
+      expect(g.label.y).toBeGreaterThan(H / 2 + 20)
+      expect(g.label.y).toBeLessThan(H / 2 + ROWGAP / 2)
+    }
   })
 })
 

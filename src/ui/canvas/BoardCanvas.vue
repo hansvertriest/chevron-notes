@@ -159,7 +159,7 @@ function onLabelKey(e: KeyboardEvent, id: RelationId) {
       <template v-for="e in edges" :key="e.id">
         <div
           v-if="!e.type.plain"
-          class="label"
+          class="label edge-label"
           :class="[`tone-${e.type.tone}`, { fresh: fresh.has(e.id), selected: e.id === selectedRelation }]"
           :style="{ left: `${e.geo.label.x}px`, top: `${e.geo.label.y}px` }"
           :data-relation="e.id"
@@ -234,8 +234,6 @@ function onLabelKey(e: KeyboardEvent, id: RelationId) {
 .label {
   position: absolute;
   transform: translate(-50%, -50%);
-  font: 11px var(--mono);
-  padding: 1px 6px;
   border-radius: 9px;
   background: var(--bg);
   color: var(--tone);

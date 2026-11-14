@@ -14,26 +14,27 @@ export interface Box {
 }
 
 const ARROW_GAP = 2
-/** Same-row neighbours are closer than this (beyond their half widths); farther means notes in between. */
-const NEIGHBOUR_GAP = 60
+/**
+ * Where on a curve between rows its label sits: past the middle, towards
+ * the child. Siblings' labels then sit apart, above each child, instead of
+ * piling up where the curves leave their shared parent.
+ */
+const LABEL_T = 0.68
 
 const r = (n: number) => Math.round(n * 100) / 100
 
-/** The point where a ray from the centre of a box leaves the box, plus `pad`. */
-function boxExit({ at, size }: Box, dx: number, dy: number, pad: number): Point {
-  const t = Math.min(
-    (size.width / 2 + pad) / Math.max(Math.abs(dx), 1e-6),
-    (size.height / 2 + pad) / Math.max(Math.abs(dy), 1e-6),
-  )
-  return { x: at.x + dx * t, y: at.y + dy * t }
+function cubic(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const u = 1 - t
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
 }
 
 /**
  * Between rows: a vertical bezier from the bottom of one box to the top of
- * the other, labelled at its midpoint. Within a row: a straight line between
- * neighbours, and a curve dipping below the row when notes sit in between.
+ * the other, labelled on the curve towards the lower end. Within a row: a
+ * curve dipping below the row, labelled at its lowest point, so the label
+ * has room even between neighbours.
  */
-export function edgeGeometry(a: Box, b: Box, rowGap = 84): EdgeGeometry {
+export function edgeGeometry(a: Box, b: Box, rowGap = 100): EdgeGeometry {
   const ha = a.size.height / 2
   const hb = b.size.height / 2
   const dy = b.at.y - a.at.y
@@ -43,27 +44,20 @@ export function edgeGeometry(a: Box, b: Box, rowGap = 84): EdgeGeometry {
     const y1 = a.at.y + s * ha
     const y2 = b.at.y - s * (hb + ARROW_GAP)
     const m = (y1 + y2) / 2
+    // Towards whichever end is lower, so the label is above the child.
+    const t = s > 0 ? LABEL_T : 1 - LABEL_T
     return {
       d: `M${ax},${r(y1)} C${ax},${r(m)} ${bx},${r(m)} ${bx},${r(y2)}`,
-      label: { x: (a.at.x + b.at.x) / 2, y: m },
+      label: { x: cubic(a.at.x, a.at.x, b.at.x, b.at.x, t), y: cubic(y1, m, m, y2, t) },
     }
   }
   const dx = b.at.x - a.at.x
-  if (Math.abs(dx) > (a.size.width + b.size.width) / 2 + NEIGHBOUR_GAP) {
-    // Same row, with notes in between: dip below the row instead of crossing them.
-    const y1 = a.at.y + ha
-    const y2 = b.at.y + hb + ARROW_GAP
-    const depth = Math.min(rowGap * 0.7, 30 + Math.abs(dx) * 0.05)
-    return {
-      d: `M${ax},${r(y1)} C${ax},${r(y1 + depth)} ${bx},${r(y2 + depth)} ${bx},${r(y2)}`,
-      label: { x: (a.at.x + b.at.x) / 2, y: (y1 + y2) / 2 + depth * 0.75 },
-    }
-  }
-  const p1 = boxExit(a, dx, dy, 0)
-  const p2 = boxExit(b, -dx, -dy, ARROW_GAP)
+  const y1 = a.at.y + ha
+  const y2 = b.at.y + hb + ARROW_GAP
+  const depth = Math.min(rowGap * 0.45, 30 + Math.abs(dx) * 0.05)
   return {
-    d: `M${r(p1.x)},${r(p1.y)} L${r(p2.x)},${r(p2.y)}`,
-    label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+    d: `M${ax},${r(y1)} C${ax},${r(y1 + depth)} ${bx},${r(y2 + depth)} ${bx},${r(y2)}`,
+    label: { x: (a.at.x + b.at.x) / 2, y: (y1 + y2) / 2 + depth * 0.75 },
   }
 }
 
