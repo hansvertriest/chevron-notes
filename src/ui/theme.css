@@ -1,0 +1,128 @@
+/* All colours are tokens. Dark by default; light when the system asks for it. */
+:root {
+  color-scheme: dark light;
+  --bg: #15171b;
+  --surface: #1f2228;
+  --surface-2: #272b32;
+  --ink: #e7e9ee;
+  --muted: #8d939e;
+  --line: #3a3f48;
+  --accent: #7aa2ff;
+  --positive: #5fcf8a;
+  --negative: #f2716b;
+  --neutral: #8d939e;
+  --shadow: 0 8px 30px rgb(0 0 0 / 0.35);
+  --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface-2: #f0f1f4;
+    --ink: #1d2026;
+    --muted: #6b717c;
+    --line: #d5d8de;
+    --accent: #3d6bea;
+    --positive: #1f9d55;
+    --negative: #d6453d;
+    --neutral: #7a808a;
+    --shadow: 0 8px 30px rgb(0 0 0 / 0.12);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px/1.4 var(--sans);
+}
+
+kbd {
+  font: 11px var(--mono);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--muted);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.btn.primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn.danger {
+  color: var(--negative);
+}
+.btn.danger.armed {
+  border-color: var(--negative);
+  background: color-mix(in srgb, var(--negative) 14%, var(--surface));
+}
+
+.tone-positive {
+  --tone: var(--positive);
+}
+.tone-negative {
+  --tone: var(--negative);
+}
+.tone-neutral {
+  --tone: var(--neutral);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
