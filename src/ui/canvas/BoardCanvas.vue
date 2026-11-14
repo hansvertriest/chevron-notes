@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Board, NoteId, RelationId, Tone } from '../../domain'
 import { DEFAULT_LAYOUT, edgeGeometry, type Point, type Size } from '../../layout'
+import { useCanvasGestures } from './gestures'
 import NoteCard from './NoteCard.vue'
 import type { CameraControls } from './useCamera'
 
@@ -57,31 +58,8 @@ const worldStyle = computed(() => {
 
 /* ---------- pan and zoom ---------- */
 const frame = ref<HTMLElement>()
-let drag: { x: number; y: number } | null = null
-const dragging = ref(false)
-
-function onPointerDown(e: PointerEvent) {
-  if (e.button !== 0) return
-  const t = e.target as Element
-  if (t.closest('.note, .label') || t.classList.contains('hit')) return
-  emit('backgroundDown')
-  drag = { x: e.clientX, y: e.clientY }
-  dragging.value = true
-  frame.value?.setPointerCapture(e.pointerId)
-}
-function onPointerMove(e: PointerEvent) {
-  if (!drag) return
-  props.cam.panBy(e.clientX - drag.x, e.clientY - drag.y)
-  drag = { x: e.clientX, y: e.clientY }
-}
-function onPointerUp() {
-  drag = null
-  dragging.value = false
-}
-function onWheel(e: WheelEvent) {
-  const r = frame.value!.getBoundingClientRect()
-  props.cam.zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015))
-}
+const gestures = useCanvasGestures(frame, props.cam, () => emit('backgroundDown'))
+const dragging = gestures.dragging
 
 let observer: ResizeObserver | undefined
 onMounted(() => {
@@ -113,11 +91,12 @@ function onLabelKey(e: KeyboardEvent, id: RelationId) {
     ref="frame"
     class="frame"
     :class="{ dragging }"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerUp"
-    @wheel.prevent="onWheel"
+    @pointerdown="gestures.onPointerDown"
+    @pointermove="gestures.onPointerMove"
+    @pointerup="gestures.onPointerUp"
+    @pointercancel="gestures.onPointerUp"
+    @click.capture="gestures.onClickCapture"
+    @wheel.prevent="gestures.onWheel"
   >
     <div class="world" :style="worldStyle">
       <svg
