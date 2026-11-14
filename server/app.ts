@@ -8,12 +8,18 @@ import type { BoardFile } from './boardFile.ts'
  *   GET  /api/health  → 200
  *   GET  /api/board   → 200 board JSON, or 404 when there is none yet
  *   PUT  /api/board   → 204 after the board is written
+ *
+ * Every response carries `X-Chevron-Api`, so the app can tell this API's
+ * answers from a dev proxy's error page when the API isn't running.
  */
+
+export const API_HEADER = 'X-Chevron-Api'
 
 const MAX_BODY = 5 * 1024 * 1024
 
 export function createApi(file: BoardFile): Server {
   return createServer((req, res) => {
+    res.setHeader(API_HEADER, '1')
     handle(file, req, res).catch((e: unknown) => {
       console.error(e)
       send(res, 500, { error: 'Internal error' })

@@ -2,6 +2,9 @@ import { createBoard, systemContext, type Board, type Context } from '../domain'
 import { RepositoryError, RepositoryUnavailableError, type BoardRepository } from './BoardRepository'
 import { parseBoard } from './serialize'
 
+/** Set by `server/app.ts` on every response. */
+const API_HEADER = 'X-Chevron-Api'
+
 /** The PoC repository: one board as JSON, through the local API in `server/`. */
 export class HttpBoardRepository implements BoardRepository {
   constructor(
@@ -33,9 +36,9 @@ export class HttpBoardRepository implements BoardRepository {
     } catch (e) {
       throw new RepositoryUnavailableError(e instanceof Error ? e.message : 'The local API is unreachable.')
     }
-    // The Vite dev proxy answers 502/504 when the API isn't running.
-    if (res.status === 502 || res.status === 503 || res.status === 504)
-      throw new RepositoryUnavailableError('The local API is unreachable.')
+    // Without this header the answer came from something else, such as the
+    // Vite dev proxy reporting that the API isn't running.
+    if (!res.headers.has(API_HEADER)) throw new RepositoryUnavailableError('The local API is unreachable.')
     return res
   }
 }
