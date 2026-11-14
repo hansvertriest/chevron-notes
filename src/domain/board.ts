@@ -1,3 +1,4 @@
+import { newUuid } from './ids'
 import { checkRelationTypeDraft, STARTER_RELATION_TYPES, type RelationTypeDraft } from './relationTypes'
 import {
   SCHEMA_VERSION,
@@ -24,7 +25,7 @@ export interface Context {
 }
 
 export const systemContext: Context = {
-  newId: () => crypto.randomUUID(),
+  newId: newUuid,
   now: () => new Date().toISOString(),
 }
 
