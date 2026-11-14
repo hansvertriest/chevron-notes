@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/start.ts",
+    "start:lan": "node scripts/start.ts --host 0.0.0.0",
     "dev": "vite",
     "api": "node server/main.ts",
     "build": "vue-tsc -b && vite build",

@@ -23,6 +23,10 @@ npm install
 npm start        # the API on :5174 and the app on http://localhost:5173
 ```
 
+To open it on another device on the same network (a tablet, say), run
+`npm run start:lan` and use the Network URL Vite prints. Only the app is exposed;
+the API stays on 127.0.0.1 behind Vite's proxy.
+
 Or run them separately with `npm run api` and `npm run dev`. The board is stored
 in `data/board.json`; set `CHEVRON_BOARD_FILE` or `CHEVRON_API_PORT` to change that.
 
