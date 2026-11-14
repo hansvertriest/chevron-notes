@@ -5,6 +5,7 @@ import {
   createBoard,
   deleteNote,
   deleteRelation,
+  setNoteQuestion,
   setRelationType,
   swapRelation,
   systemContext,
@@ -116,8 +117,9 @@ export function createBoardStore(repo: BoardRepository, ctx: Context = systemCon
       change(result.board)
       return result.type
     },
-    updateNoteText(id: NoteId, text: string) {
-      change(updateNoteText(board.value, id, text))
+    /** Text and question mark together, as one change. */
+    editNote(id: NoteId, text: string, question: boolean) {
+      change(setNoteQuestion(updateNoteText(board.value, id, text), id, question))
     },
     deleteNote(id: NoteId) {
       change(deleteNote(board.value, id))

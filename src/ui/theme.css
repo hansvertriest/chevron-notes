@@ -11,6 +11,7 @@
   --positive: #5fcf8a;
   --negative: #f2716b;
   --neutral: #8d939e;
+  --question: #e8c547;
   --shadow: 0 8px 30px rgb(0 0 0 / 0.35);
   --mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -28,6 +29,7 @@
     --positive: #1f9d55;
     --negative: #d6453d;
     --neutral: #7a808a;
+    --question: #c99a06;
     --shadow: 0 8px 30px rgb(0 0 0 / 0.12);
   }
 }

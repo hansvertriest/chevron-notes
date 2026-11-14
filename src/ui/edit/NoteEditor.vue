@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { DomainError, nameFrom, noteById, relationsOf, relationTypeById, type NoteId, type RelationId } from '../../domain'
+import { DomainError, nameFrom, splitQuestion, noteById, relationsOf, relationTypeById, type NoteId, type RelationId } from '../../domain'
 import type { Point } from '../../layout'
 import { useBoardStore } from '../state/boardStore'
 import Popover from './Popover.vue'
@@ -35,6 +35,7 @@ const relations = computed(() =>
 )
 
 const text = ref(note.value?.text ?? '')
+const question = ref(note.value?.question ?? false)
 const error = ref<string | null>(null)
 const armed = ref(false)
 const textInput = ref<HTMLInputElement>()
@@ -42,7 +43,10 @@ const deleteButton = ref<HTMLButtonElement>()
 
 function save() {
   try {
-    if (text.value.trim() !== note.value?.text) store.updateNoteText(props.noteId, text.value)
+    // Same rule as the bar: a trailing ? marks a question and isn't kept in the text.
+    const split = splitQuestion(text.value)
+    const q = question.value || split.question
+    if (split.text !== note.value?.text || q !== !!note.value?.question) store.editNote(props.noteId, split.text, q)
     emit('close', false)
   } catch (e) {
     if (!(e instanceof DomainError)) throw e
@@ -83,6 +87,7 @@ onMounted(() => {
   <Popover v-if="note" :anchor="anchor" :viewport="viewport" @keydown="onKey">
     <div class="hd">Note</div>
     <input ref="textInput" v-model="text" aria-label="Note text" @input="error = null" />
+    <label class="q"><input v-model="question" type="checkbox" /> Question <span class="hint">(or end the text with ?)</span></label>
     <div v-if="error" class="msg">{{ error }}</div>
     <div v-if="relations.length" class="rels">
       <button v-for="r in relations" :key="r.id" type="button" @click="emit('openRelation', r.id)">
@@ -125,6 +130,18 @@ onMounted(() => {
 .name {
   font-family: var(--mono);
   color: var(--tone);
+}
+.q {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.q input {
+  accent-color: var(--question);
+}
+.q .hint {
+  color: var(--muted);
 }
 .none {
   font-size: 12px;

@@ -115,7 +115,11 @@ export function resolveChain(board: Board, input: string): ResolvedChain {
     errors.length || unknownNames.length || empty
       ? null
       : {
-          nodes: nodes.map((n) => (n.noteId ? { kind: 'existing', id: n.noteId } : { kind: 'new', text: n.text })),
+          nodes: nodes.map((n) =>
+            n.noteId
+              ? { kind: 'existing', id: n.noteId, question: n.question }
+              : { kind: 'new', text: n.text, question: n.question },
+          ),
           links: relations.map((r) => ({ typeId: r.type!.id, canonical: r.canonical! })),
         }
 

@@ -1,9 +1,11 @@
+import { splitQuestion } from '../domain'
+
 /**
  * Syntax of the command bar, with no knowledge of the board:
  *
  *   chain    = node ( relation node )*
  *   relation = whitespace "-" name? ">" whitespace?     (no name: a plain link)
- *   node     = "@" query | text
+ *   node     = ( "@" query | text ) "?"?           (a trailing ? marks a question)
  *
  * A relation needs a space before the `-`, so `e-mail` or `a->b` stay text.
  */
@@ -19,6 +21,8 @@ export interface NodeSegment extends Span {
   text: string
   /** True for an `@reference` to an existing note. */
   ref: boolean
+  /** True when the text ended with `?`, which is stripped from `text`. */
+  question: boolean
 }
 
 export interface RelationSegment extends Span {
@@ -34,7 +38,8 @@ const RELATION_TOKEN = /\s+-([a-z][a-z0-9_-]*)?>\s*/gi
 function nodeSegment(input: string, start: number, end: number): NodeSegment {
   const raw = input.slice(start, end).trim()
   const ref = raw.startsWith('@')
-  return { kind: 'node', text: ref ? raw.slice(1).trim() : raw, ref, start, end }
+  const { text, question } = splitQuestion(ref ? raw.slice(1) : raw)
+  return { kind: 'node', text, ref, question, start, end }
 }
 
 /** Splits the input into alternating node and relation segments, starting and ending with a node. */

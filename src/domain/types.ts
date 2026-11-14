@@ -30,6 +30,8 @@ export interface Note {
   id: NoteId
   text: string
   createdAt: string
+  /** An open question: typed with a trailing `?`, drawn yellow. Absent means false. */
+  question?: boolean
 }
 
 /** Always stored in canonical direction: `from -canonical-> to`. */

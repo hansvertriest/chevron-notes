@@ -9,7 +9,9 @@ import {
   nameFrom,
   relationsOf,
   searchNotes,
+  setNoteQuestion,
   setRelationType,
+  splitQuestion,
   swapRelation,
   updateNoteText,
   type ChainPlan,
@@ -148,6 +150,34 @@ describe('applyChain', () => {
     const { ctx, board } = fresh()
     applyChain(board, { nodes: chain('a'), links: [] }, ctx)
     expect(board.notes).toEqual([])
+  })
+})
+
+describe('questions', () => {
+  it('splits a trailing ? off the text', () => {
+    expect(splitQuestion('  why so slow ?? ')).toEqual({ text: 'why so slow', question: true })
+    expect(splitQuestion('why? because')).toEqual({ text: 'why? because', question: false })
+    expect(splitQuestion('?')).toEqual({ text: '', question: true })
+  })
+
+  it('creates question notes and marks existing ones, never unmarking', () => {
+    const { ctx, board: b0 } = fresh()
+    const { board: b1 } = applyChain(b0, { nodes: [{ kind: 'new', text: 'pool', question: true }], links: [] }, ctx)
+    expect(b1.notes[0]).toMatchObject({ text: 'pool', question: true })
+    const { board: b2 } = applyChain(b1, { nodes: chain('other'), links: [] }, ctx)
+    expect(b2.notes[1]).not.toHaveProperty('question')
+    const { board: b3 } = applyChain(b2, { nodes: [{ kind: 'new', text: 'Other', question: true }], links: [] }, ctx)
+    expect(b3.notes[1]!.question).toBe(true)
+    const { board: b4 } = applyChain(b3, { nodes: [{ kind: 'existing', id: b3.notes[0]!.id }], links: [] }, ctx)
+    expect(b4.notes[0]!.question).toBe(true)
+  })
+
+  it('toggles the question mark from the editor', () => {
+    const { ctx, board: b0 } = fresh()
+    const { board } = applyChain(b0, { nodes: chain('a'), links: [] }, ctx)
+    const id = board.notes[0]!.id
+    expect(setNoteQuestion(board, id, true).notes[0]!.question).toBe(true)
+    expect(setNoteQuestion(setNoteQuestion(board, id, true), id, false).notes[0]).not.toHaveProperty('question')
   })
 })
 

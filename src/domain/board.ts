@@ -79,7 +79,20 @@ export function relationsOf(board: Board, noteId: NoteId): Relation[] {
 
 /* ---------- adding a chain ---------- */
 
-export type ChainNode = { kind: 'existing'; id: NoteId } | { kind: 'new'; text: string }
+/** `question: true` marks the note as a question; an existing note is never unmarked by a chain. */
+export type ChainNode =
+  | { kind: 'existing'; id: NoteId; question?: boolean }
+  | { kind: 'new'; text: string; question?: boolean }
+
+/**
+ * The question rule: text that ends with `?` is a question, and the `?` is
+ * not part of its text. `how do we invalidate on writes?` becomes the text
+ * `how do we invalidate on writes`, marked as a question.
+ */
+export function splitQuestion(raw: string): { text: string; question: boolean } {
+  const m = /^(.*?)\s*\?+\s*$/s.exec(raw)
+  return m ? { text: m[1]!.trim(), question: true } : { text: raw.trim(), question: false }
+}
 
 export interface ChainLink {
   typeId: RelationTypeId
@@ -112,16 +125,25 @@ export function applyChain(board: Board, plan: ChainPlan, ctx: Context): ChainRe
   const createdNoteIds: NoteId[] = []
   const createdRelationIds: RelationId[] = []
 
+  const markQuestion = (id: NoteId) => {
+    const i = notes.findIndex((n) => n.id === id)
+    if (i >= 0 && !notes[i]!.question) notes[i] = { ...notes[i]!, question: true }
+  }
+
   const ids = plan.nodes.map((node) => {
     if (node.kind === 'existing') {
       if (!notes.some((n) => n.id === node.id)) throw new DomainError('That note no longer exists.')
+      if (node.question) markQuestion(node.id)
       return node.id
     }
     const text = node.text.trim()
     if (!text) throw new DomainError('A note needs some text.')
     const same = notes.find((n) => norm(n.text) === norm(text))
-    if (same) return same.id
-    const note: Note = { id: ctx.newId(), text, createdAt: now }
+    if (same) {
+      if (node.question) markQuestion(same.id)
+      return same.id
+    }
+    const note: Note = { id: ctx.newId(), text, createdAt: now, ...(node.question ? { question: true } : {}) }
     notes.push(note)
     createdNoteIds.push(note.id)
     return note.id
@@ -157,6 +179,18 @@ export function updateNoteText(board: Board, id: NoteId, text: string): Board {
   const same = findNoteByText(board, t)
   if (same && same.id !== id) throw new DomainError('Another note already has this text.')
   return { ...board, notes: board.notes.map((n) => (n.id === id ? { ...n, text: t } : n)) }
+}
+
+export function setNoteQuestion(board: Board, id: NoteId, question: boolean): Board {
+  if (!noteById(board, id)) throw new DomainError('That note no longer exists.')
+  return {
+    ...board,
+    notes: board.notes.map((n) => {
+      if (n.id !== id) return n
+      const { question: _, ...rest } = n
+      return question ? { ...rest, question: true } : rest
+    }),
+  }
 }
 
 /** Deletes a note together with all of its relations. */

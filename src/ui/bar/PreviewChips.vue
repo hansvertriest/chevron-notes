@@ -15,9 +15,9 @@ const summary = computed(() => {
     <template v-for="(p, i) in chain.parts" :key="i">
       <template v-if="p.kind === 'node'">
         <span v-if="p.status === 'unmatched'" class="chip err" title="no single note matches">@{{ p.text }} ?</span>
-        <span v-else-if="p.status === 'ref'" class="chip ref" title="existing note">@ {{ p.display }}</span>
-        <span v-else-if="p.status === 'reuse'" class="chip ref" title="same text as an existing note: reused">= {{ p.display }}</span>
-        <span v-else-if="p.status === 'new'" class="chip new" title="new note">+ {{ p.display }}</span>
+        <span v-else-if="p.status === 'ref'" class="chip ref" :class="{ question: p.question }" title="existing note">@ {{ p.display }}</span>
+        <span v-else-if="p.status === 'reuse'" class="chip ref" :class="{ question: p.question }" title="same text as an existing note: reused">= {{ p.display }}</span>
+        <span v-else-if="p.status === 'new'" class="chip new" :class="{ question: p.question }" title="new note">+ {{ p.display }}</span>
       </template>
       <template v-else>
         <span v-if="p.status === 'unknown'" class="chip err" title="unknown relation: you’ll define it on ↵">? {{ p.name }}</span>
@@ -63,6 +63,15 @@ const summary = computed(() => {
 .chip.ref {
   border-color: var(--accent);
   color: var(--accent);
+}
+.chip.question {
+  border-color: var(--question);
+  background: color-mix(in srgb, var(--question) 22%, transparent);
+}
+.chip.question::after {
+  content: ' ?';
+  color: var(--question);
+  font-weight: 700;
 }
 .chip.err {
   border-color: var(--negative);

@@ -16,7 +16,7 @@ function boardWith(...texts: string[]): Board {
 describe('parseChain', () => {
   it('reads a single note', () => {
     expect(parseChain('Performance issue')).toEqual([
-      { kind: 'node', text: 'Performance issue', ref: false, start: 0, end: 17 },
+      { kind: 'node', text: 'Performance issue', ref: false, question: false, start: 0, end: 17 },
     ])
   })
 
@@ -42,6 +42,16 @@ describe('parseChain', () => {
     expect(parseChain('a - b')).toHaveLength(1)
   })
 
+  it('strips a trailing ? and marks the node as a question', () => {
+    const segs = parseChain('Redis or in-memory?? -answered-by> @pool size ? -> plain')
+    expect(segs.filter((s) => s.kind === 'node').map((s) => [s.text, s.question])).toEqual([
+      ['Redis or in-memory', true],
+      ['pool size', true],
+      ['plain', false],
+    ])
+    expect(parseChain('why? because')[0]).toMatchObject({ text: 'why? because', question: false })
+  })
+
   it('keeps an unfinished relation as an empty node at the end', () => {
     expect(parseChain('a -improves> ').at(-1)).toMatchObject({ kind: 'node', text: '' })
   })
@@ -64,7 +74,7 @@ describe('resolveChain', () => {
       { typeId: 'blocked-by', canonical: false },
       { typeId: 'improved-by', canonical: false },
     ])
-    expect(r.plan?.nodes[0]).toEqual({ kind: 'existing', id: board.notes[0]!.id })
+    expect(r.plan?.nodes[0]).toEqual({ kind: 'existing', id: board.notes[0]!.id, question: false })
   })
 
   it('reuses notes with the same text', () => {
@@ -93,6 +103,15 @@ describe('resolveChain', () => {
 
   it('refuses a note linked to itself', () => {
     expect(resolveChain(board, 'a -> A').errors).toEqual(['A note can’t relate to itself.'])
+  })
+
+  it('passes the question mark on to the plan, for new and existing notes', () => {
+    const r = resolveChain(board, 'is it the pool? -caused-by> @raising max?')
+    expect(r.parts[0]).toMatchObject({ status: 'new', display: 'is it the pool' })
+    expect(r.plan?.nodes).toEqual([
+      { kind: 'new', text: 'is it the pool', question: true },
+      { kind: 'existing', id: board.notes[0]!.id, question: true },
+    ])
   })
 
   it('gives no plan for empty input', () => {

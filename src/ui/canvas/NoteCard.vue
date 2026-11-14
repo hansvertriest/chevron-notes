@@ -29,9 +29,9 @@ function onKey(e: KeyboardEvent) {
 <template>
   <div
     class="note"
-    :class="{ root, fresh, highlighted, unsaved, selected }"
+    :class="{ root, fresh, highlighted, unsaved, selected, question: note.question }"
     :style="{ transform: `translate(${at.x - 84}px, ${at.y - 23}px)` }"
-    :title="note.text"
+    :title="note.question ? `${note.text}?` : note.text"
     :data-note="note.id"
     tabindex="0"
     @click.stop="emit('open', false)"
@@ -90,6 +90,10 @@ function onKey(e: KeyboardEvent) {
   animation: pop-in 0.5s ease-out;
   border-color: var(--accent);
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.question .inner {
+  border-color: var(--question);
+  background: color-mix(in srgb, var(--question) 22%, var(--surface));
 }
 .unsaved .inner {
   border-style: dashed;
