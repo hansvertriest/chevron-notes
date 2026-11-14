@@ -1,0 +1,6 @@
+node_modules
+dist
+*.tsbuildinfo
+.dyffle
+# the local board lives here; see server/README in the main README
+data/
