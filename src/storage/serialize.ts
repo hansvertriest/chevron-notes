@@ -1,5 +1,5 @@
 import { SCHEMA_VERSION, type Board } from '../domain'
-import { RepositoryError } from './BoardRepository'
+import { RepositoryError, type BoardSummary } from './BoardRepository'
 
 /**
  * Turns stored JSON into a Board, checking its shape. Older schema versions
@@ -25,6 +25,15 @@ export function parseBoard(data: unknown): Board {
     )
   if (!ok) throw new RepositoryError('The stored board is malformed.')
   return data as unknown as Board
+}
+
+/** The board list from the API, checked. */
+export function parseSummaries(data: unknown): BoardSummary[] {
+  const ok =
+    Array.isArray(data) &&
+    data.every((b) => isObject(b) && typeof b.id === 'string' && typeof b.name === 'string' && typeof b.updatedAt === 'string')
+  if (!ok) throw new RepositoryError('The board list is malformed.')
+  return data as BoardSummary[]
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {

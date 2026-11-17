@@ -172,6 +172,12 @@ export function applyChain(board: Board, plan: ChainPlan, ctx: Context): ChainRe
 
 /* ---------- editing ---------- */
 
+export function renameBoard(board: Board, name: string): Board {
+  const n = name.trim()
+  if (!n) throw new DomainError('A board needs a name.')
+  return { ...board, name: n }
+}
+
 export function updateNoteText(board: Board, id: NoteId, text: string): Board {
   const t = text.trim()
   if (!t) throw new DomainError('A note needs some text.')

@@ -8,6 +8,7 @@ import {
   findNoteByText,
   nameFrom,
   relationsOf,
+  renameBoard,
   searchNotes,
   setNoteQuestion,
   setRelationType,
@@ -41,6 +42,14 @@ describe('createBoard', () => {
       'contradicts',
       '->',
     ])
+  })
+})
+
+describe('renameBoard', () => {
+  it('trims the name and refuses an empty one', () => {
+    const { board } = fresh()
+    expect(renameBoard(board, '  Ideas ').name).toBe('Ideas')
+    expect(() => renameBoard(board, '  ')).toThrow(DomainError)
   })
 })
 

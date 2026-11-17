@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createBoard } from '../domain'
 import { testContext } from '../domain/testing'
-import { RepositoryError, RepositoryUnavailableError } from './BoardRepository'
+import { BoardNotFoundError, RepositoryError, RepositoryUnavailableError } from './BoardRepository'
 import { HttpBoardRepository } from './HttpBoardRepository'
 import { parseBoard } from './serialize'
 
@@ -19,21 +19,26 @@ describe('parseBoard', () => {
 })
 
 describe('HttpBoardRepository', () => {
-  it('starts a new board when none is stored', async () => {
-    const repo = new HttpBoardRepository('/api', testContext(), fakeFetch(() => api(404)))
-    expect((await repo.load()).notes).toEqual([])
+  it('reports a missing board', async () => {
+    const repo = new HttpBoardRepository('/api', fakeFetch(() => api(404)))
+    await expect(repo.load('x')).rejects.toBeInstanceOf(BoardNotFoundError)
+  })
+
+  it('rejects a malformed board list', async () => {
+    const repo = new HttpBoardRepository('/api', fakeFetch(() => new Response('[{"id":1}]', { headers: { 'X-Chevron-Api': '1' } })))
+    await expect(repo.list()).rejects.toBeInstanceOf(RepositoryError)
   })
 
   it('reports an unreachable API as unavailable', async () => {
-    const down = new HttpBoardRepository('/api', testContext(), fakeFetch(() => Promise.reject(new TypeError('fetch failed'))))
-    await expect(down.load()).rejects.toBeInstanceOf(RepositoryUnavailableError)
+    const down = new HttpBoardRepository('/api', fakeFetch(() => Promise.reject(new TypeError('fetch failed'))))
+    await expect(down.list()).rejects.toBeInstanceOf(RepositoryUnavailableError)
     // The Vite proxy answers 500 without the API's header when the API is down.
-    const proxy = new HttpBoardRepository('/api', testContext(), fakeFetch(() => new Response(null, { status: 500 })))
+    const proxy = new HttpBoardRepository('/api', fakeFetch(() => new Response(null, { status: 500 })))
     await expect(proxy.save(createBoard(testContext()))).rejects.toBeInstanceOf(RepositoryUnavailableError)
   })
 
   it('reports a refused save', async () => {
-    const repo = new HttpBoardRepository('/api', testContext(), fakeFetch(() => api(500)))
+    const repo = new HttpBoardRepository('/api', fakeFetch(() => api(500)))
     await expect(repo.save(createBoard(testContext()))).rejects.toBeInstanceOf(RepositoryError)
   })
 })

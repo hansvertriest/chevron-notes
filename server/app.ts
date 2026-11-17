@@ -1,13 +1,15 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import type { BoardFile } from './boardFile.ts'
+import { isBoardId, type BoardFolder } from './boardFolder.ts'
 
 /**
  * The tiny local API. It stores the board JSON it is given and knows nothing
  * about the domain beyond a basic shape check; validation lives in the app.
  *
- *   GET  /api/health  → 200
- *   GET  /api/board   → 200 board JSON, or 404 when there is none yet
- *   PUT  /api/board   → 204 after the board is written
+ *   GET    /api/health      → 200
+ *   GET    /api/boards      → 200 [{ id, name, updatedAt }], most recent first
+ *   GET    /api/boards/:id  → 200 board JSON, or 404
+ *   PUT    /api/boards/:id  → 204 after the board is written (its `id` must match)
+ *   DELETE /api/boards/:id  → 204, or 404
  *
  * Every response carries `X-Chevron-Api`, so the app can tell this API's
  * answers from a dev proxy's error page when the API isn't running.
@@ -17,24 +19,33 @@ export const API_HEADER = 'X-Chevron-Api'
 
 const MAX_BODY = 5 * 1024 * 1024
 
-export function createApi(file: BoardFile): Server {
+export function createApi(boards: BoardFolder): Server {
   return createServer((req, res) => {
     res.setHeader(API_HEADER, '1')
-    handle(file, req, res).catch((e: unknown) => {
+    handle(boards, req, res).catch((e: unknown) => {
       console.error(e)
       send(res, 500, { error: 'Internal error' })
     })
   })
 }
 
-async function handle(file: BoardFile, req: IncomingMessage, res: ServerResponse) {
+async function handle(boards: BoardFolder, req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? '/', 'http://localhost')
   if (url.pathname === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true })
-  if (url.pathname !== '/api/board') return send(res, 404, { error: 'Not found' })
+
+  if (url.pathname === '/api/boards') {
+    if (req.method !== 'GET') return notAllowed(res, 'GET')
+    return send(res, 200, await boards.list())
+  }
+
+  const match = /^\/api\/boards\/([^/]+)$/.exec(url.pathname)
+  if (!match) return send(res, 404, { error: 'Not found' })
+  const id = decodeURIComponent(match[1]!)
+  if (!isBoardId(id)) return send(res, 400, { error: 'Bad board id' })
 
   if (req.method === 'GET') {
-    const json = await file.read()
-    if (json === null) return send(res, 404, { error: 'No board yet' })
+    const json = await boards.read(id)
+    if (json === null) return send(res, 404, { error: 'No such board' })
     res.writeHead(200, { 'Content-Type': 'application/json' })
     return res.end(json)
   }
@@ -50,12 +61,23 @@ async function handle(file: BoardFile, req: IncomingMessage, res: ServerResponse
     }
     if (typeof data !== 'object' || data === null || typeof (data as { schemaVersion?: unknown }).schemaVersion !== 'number')
       return send(res, 400, { error: 'Not a board' })
-    await file.write(JSON.stringify(data, null, 2) + '\n')
+    if ((data as { id?: unknown }).id !== id) return send(res, 400, { error: 'Board id does not match the URL' })
+    await boards.write(id, JSON.stringify(data, null, 2) + '\n')
     res.writeHead(204)
     return res.end()
   }
 
-  res.setHeader('Allow', 'GET, PUT')
+  if (req.method === 'DELETE') {
+    if (!(await boards.remove(id))) return send(res, 404, { error: 'No such board' })
+    res.writeHead(204)
+    return res.end()
+  }
+
+  notAllowed(res, 'GET, PUT, DELETE')
+}
+
+function notAllowed(res: ServerResponse, allow: string) {
+  res.setHeader('Allow', allow)
   send(res, 405, { error: 'Method not allowed' })
 }
 
