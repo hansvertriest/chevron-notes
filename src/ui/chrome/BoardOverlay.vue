@@ -8,16 +8,16 @@ defineProps<{ load: LoadState; empty: boolean; error: string | null }>()
   <div v-if="load === 'loading'" class="over">
     <div class="skel-row"><div class="skel"></div></div>
     <div class="skel-row"><div class="skel"></div><div class="skel"></div></div>
-    <span>Loading board.json…</span>
+    <span>Loading board…</span>
   </div>
   <div v-else-if="load === 'offline'" class="over">
     <b>Can’t reach the local API</b>
     <span>Nothing was loaded, and nothing is lost. Start it with <code>npm run api</code>, then press <kbd>↵</kbd> to retry.</span>
   </div>
   <div v-else-if="load === 'error'" class="over">
-    <b>Can’t read board.json</b>
+    <b>Can’t read this board</b>
     <span>{{ error }}</span>
-    <span>Fix or move the file, then press <kbd>↵</kbd> to retry.</span>
+    <span>Pick another board in the top-left, or fix its file in <code>data/boards/</code> and press <kbd>↵</kbd> to retry.</span>
   </div>
   <div v-else-if="empty" class="over">
     <b>An empty board</b>

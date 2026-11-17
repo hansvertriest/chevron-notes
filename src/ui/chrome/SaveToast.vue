@@ -5,7 +5,7 @@ const emit = defineEmits<{ retry: [] }>()
 
 <template>
   <div class="box toast" role="alert">
-    <span class="msg">Couldn’t write board.json. Your changes are kept here.</span>
+    <span class="msg">Couldn’t save this board. Your changes are kept here.</span>
     <span v-if="error" class="detail">{{ error }}</span>
     <button class="btn primary" type="button" @click="emit('retry')">Retry</button>
   </div>

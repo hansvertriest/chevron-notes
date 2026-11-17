@@ -27,8 +27,16 @@ To open it on another device on the same network (a tablet, say), run
 `npm run start:lan` and use the Network URL Vite prints. Only the app is exposed;
 the API stays on 127.0.0.1 behind Vite's proxy.
 
-Or run them separately with `npm run api` and `npm run dev`. The board is stored
-in `data/board.json`; set `CHEVRON_BOARD_FILE` or `CHEVRON_API_PORT` to change that.
+Or run them separately with `npm run api` and `npm run dev`. Each board is
+stored as `data/boards/<id>.json`; set `CHEVRON_DATA_DIR` or `CHEVRON_API_PORT`
+to change that. A `data/board.json` from before multiple boards is moved into
+`data/boards/` when the API starts.
+
+## Boards
+
+The board name in the top-left opens the board list: switch boards, or create,
+rename and delete one. The open board's id is in the URL (`#<id>`), so a link
+or a reload opens the same board.
 
 ```sh
 npm test         # Vitest: domain, parser, layout, storage, API, store

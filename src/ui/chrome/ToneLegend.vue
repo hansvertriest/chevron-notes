@@ -24,8 +24,8 @@ const groups = computed(() =>
 <style scoped>
 .legend {
   position: absolute;
-  left: 14px;
-  top: 12px;
+  left: 16px;
+  top: 42px;
   font-size: 11px;
   color: var(--muted);
   display: flex;

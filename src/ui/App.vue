@@ -8,6 +8,7 @@ import BoardCanvas from './canvas/BoardCanvas.vue'
 import { measureLabel, measureNote } from './canvas/measure'
 import { useCamera } from './canvas/useCamera'
 import BoardOverlay from './chrome/BoardOverlay.vue'
+import BoardSwitcher from './chrome/BoardSwitcher.vue'
 import SaveStatus from './chrome/SaveStatus.vue'
 import SaveToast from './chrome/SaveToast.vue'
 import ToneLegend from './chrome/ToneLegend.vue'
@@ -47,17 +48,39 @@ function boundsFor(ids: readonly NoteId[]) {
   return boundsOf(ids.flatMap((id) => (target.value[id] ? [{ at: target.value[id], size: sizeOf(id) }] : [])))
 }
 
-// Fit the whole board once it has loaded and the canvas has a size.
-let fitted = false
+// Fit the whole board once it has loaded and the canvas has a size, and again
+// each time another board opens.
+let fitted: string | null = null
 watch(
-  [store.loadState, () => cam.viewport.value.width],
-  ([state, width]) => {
-    if (fitted || state !== 'ready' || !width) return
-    fitted = true
+  [store.loadState, () => cam.viewport.value.width, () => board.value.id],
+  ([state, width, id]) => {
+    if (fitted === id || state !== 'ready' || !width) return
+    fitted = id
     const b = boundsFor(board.value.notes.map((n) => n.id))
-    if (b) cam.set(cam.fitting(b))
+    cam.set(b ? cam.fitting(b) : { x: 0, y: 0, s: 1 })
   },
 )
+
+/* ---------- which board: kept in the URL, as #<board id> ---------- */
+const idFromHash = () => decodeURIComponent(location.hash.slice(1)) || null
+
+watch([() => board.value.id, store.loadState], ([id, state]) => {
+  if (state === 'ready' && idFromHash() !== id) history.replaceState(null, '', `#${encodeURIComponent(id)}`)
+})
+
+async function onHashChange() {
+  const id = idFromHash()
+  if (id && id !== board.value.id && (await store.open(id))) onSwitched()
+}
+
+/** Another board is open: nothing marked or edited carries over. */
+function onSwitched() {
+  editing.value = null
+  fresh.value = new Set()
+  highlighted.value = new Set()
+  peeked.value = null
+  if (hasFinePointer()) bar.value?.focus()
+}
 
 /* ---------- what the canvas marks ---------- */
 const fresh = shallowRef(new Set<string>())
@@ -136,11 +159,15 @@ function onGlobalKey(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', onGlobalKey)
-  void store.load()
+  window.addEventListener('hashchange', onHashChange)
+  void store.load(idFromHash())
   // On touch screens focusing would pop up the keyboard over the board.
   if (hasFinePointer()) bar.value?.focus()
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKey)
+  window.removeEventListener('hashchange', onHashChange)
+})
 </script>
 
 <template>
@@ -168,6 +195,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       :empty="board.notes.length === 0"
       :error="store.loadError.value"
     />
+    <BoardSwitcher @switched="onSwitched" />
     <ToneLegend v-if="store.loadState.value === 'ready' && board.notes.length" :types="board.relationTypes" />
     <SaveStatus :load="store.loadState.value" :save="store.saveState.value" />
 
@@ -200,7 +228,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       @peek="onPeek"
       @submitted="onSubmitted"
       @tab-to-nodes="canvas?.focusNote()"
-      @retry-load="store.load"
+      @retry-load="store.load(idFromHash())"
     />
   </main>
 </template>
